@@ -1,0 +1,117 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isVerified() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Validation Blueprints ---
+
+    function isValidCertificate(data) {
+      return data.keys().hasAll(['name', 'owner', 'issueDate', 'expiryDate', 'status', 'updatedAt', 'ownerId'])
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 512
+        && data.owner is string && data.owner.size() > 0 && data.owner.size() <= 256
+        && data.issueDate is string && data.issueDate.size() <= 64
+        && data.expiryDate is string && data.expiryDate.size() <= 64
+        && data.status is string && data.status.size() <= 32
+        && data.updatedAt == request.time
+        && data.ownerId == request.auth.uid
+        && (!data.keys().hasAny(['skp']) || data.skp is number)
+        && (!data.keys().hasAny(['nip']) || (data.nip is string && data.nip.size() <= 64))
+        && (!data.keys().hasAny(['fileUrl']) || (data.fileUrl is string && data.fileUrl.size() <= 1024))
+        && (!data.keys().hasAny(['fileName']) || (data.fileName is string && data.fileName.size() <= 512));
+    }
+
+    function isValidEmployee(data) {
+      return data.keys().hasAll(['name', 'updatedAt', 'ownerId'])
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 256
+        && data.updatedAt == request.time
+        && data.ownerId == request.auth.uid
+        && (!data.keys().hasAny(['nip']) || (data.nip is string && data.nip.size() <= 64))
+        && (!data.keys().hasAny(['role']) || (data.role is string && data.role.size() <= 256))
+        && (!data.keys().hasAny(['dept']) || (data.dept is string && data.dept.size() <= 256))
+        && (!data.keys().hasAny(['status']) || (data.status is string && data.status.size() <= 64))
+        && (!data.keys().hasAny(['image']) || (data.image is string && data.image.size() <= 1024));
+    }
+
+    // --- Collections ---
+
+    match /admins/{adminId} {
+      allow read: if isVerified() && request.auth.uid == adminId;
+      // Admins are bootstrapped or managed via backend/console, no public creation.
+    }
+
+    match /certificates/{certificateId} {
+      // 8. Secure List Queries: Enforce ownerId check
+      allow list: if isVerified() && resource.data.ownerId == request.auth.uid;
+      allow get: if isVerified() && (resource.data.ownerId == request.auth.uid || isAdmin());
+      
+      allow create: if isVerified() 
+        && isValidId(certificateId)
+        && isValidCertificate(incoming())
+        && incoming().keys().size() <= 11;
+
+      allow update: if isVerified()
+        && (existing().ownerId == request.auth.uid || isAdmin())
+        && isValidCertificate(incoming())
+        && incoming().ownerId == existing().ownerId // 9. Immortal Field: ownerId
+        && (
+          // Action: Generic Update
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'name', 'owner', 'nip', 'skp', 'issueDate', 'expiryDate', 'status', 'updatedAt', 'fileUrl', 'fileName'
+          ])
+        );
+
+      allow delete: if isVerified() && (existing().ownerId == request.auth.uid || isAdmin());
+    }
+
+    match /employees/{employeeId} {
+      allow list: if isVerified() && resource.data.ownerId == request.auth.uid;
+      allow get: if isVerified() && (resource.data.ownerId == request.auth.uid || isAdmin());
+
+      allow create: if isVerified()
+        && isValidId(employeeId)
+        && isValidEmployee(incoming())
+        && incoming().keys().size() <= 9;
+
+      allow update: if isVerified()
+        && (existing().ownerId == request.auth.uid || isAdmin())
+        && isValidEmployee(incoming())
+        && incoming().ownerId == existing().ownerId
+        && (
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'name', 'nip', 'role', 'dept', 'status', 'image', 'updatedAt'
+          ])
+        );
+
+      allow delete: if isVerified() && (existing().ownerId == request.auth.uid || isAdmin());
+    }
+  }
+}

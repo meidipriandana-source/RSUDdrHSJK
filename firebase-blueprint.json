@@ -1,0 +1,64 @@
+{
+  "entities": {
+    "Certificate": {
+      "title": "Certificate",
+      "description": "Professional certificate data for employees",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "owner": { "type": "string" },
+        "nip": { "type": "string" },
+        "skp": { "type": "number" },
+        "issueDate": { "type": "string" },
+        "expiryDate": { "type": "string" },
+        "status": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "ownerId": { "type": "string" },
+        "fileUrl": { "type": "string" },
+        "fileName": { "type": "string" }
+      },
+      "required": ["name", "owner", "issueDate", "expiryDate", "status", "updatedAt", "ownerId"]
+    },
+    "Employee": {
+      "title": "Employee",
+      "description": "Employee profile data",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "nip": { "type": "string" },
+        "role": { "type": "string" },
+        "dept": { "type": "string" },
+        "status": { "type": "string" },
+        "image": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["name", "updatedAt", "ownerId"]
+    },
+    "Admin": {
+      "title": "Admin",
+      "description": "Admin user record",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" }
+      },
+      "required": ["email"]
+    }
+  },
+  "firestore": {
+    "/certificates/{certificateId}": {
+      "schema": "Certificate",
+      "description": "Collection of professional certificates"
+    },
+    "/employees/{employeeId}": {
+      "schema": "Employee",
+      "description": "Collection of employee profile records"
+    },
+    "/admins/{adminId}": {
+      "schema": "Admin",
+      "description": "Collection of admin users"
+    }
+  }
+}
