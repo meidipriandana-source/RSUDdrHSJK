@@ -195,66 +195,6 @@ export default function SettingsView({ themeColor, onThemeChange, onExport, onRe
         </div>
       </div>
 
-      {/* Other Settings */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
-          <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-            <Bell className="w-5 h-5 text-amber-500" />
-            Notifikasi
-          </h3>
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm font-bold text-slate-700">Email Kedaluwarsa</div>
-                <div className="text-xs text-slate-500 font-medium">Kirim peringatan otomatis via email</div>
-              </div>
-              <button 
-                onClick={() => setEmailEnabled(!emailEnabled)}
-                className={cn(
-                  "w-11 h-6 rounded-full relative transition-colors duration-200",
-                  emailEnabled ? themeColor : "bg-slate-200"
-                )}
-              >
-                <div className={cn(
-                  "absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-200",
-                  emailEnabled ? "right-1" : "right-6"
-                )} />
-              </button>
-            </div>
-
-            {emailEnabled && (
-              <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
-                <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block">
-                  Peringatan Hari Sebelum Kedaluwarsa
-                </label>
-                <div className="flex items-center gap-3">
-                  <input 
-                    type="number" 
-                    value={daysBefore}
-                    onChange={(e) => setDaysBefore(parseInt(e.target.value) || 0)}
-                    className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                    min="1"
-                    max="365"
-                  />
-                  <span className="text-sm font-bold text-slate-500">Hari</span>
-                </div>
-                <p className="text-[10px] text-slate-400 font-medium">
-                  Sistem akan mengirim email pengingat kepada pegawai dan admin {daysBefore} hari sebelum sertifikat habis masa berlakunya.
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-        <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
-          <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-            <Lock className="w-5 h-5 text-indigo-500" />
-            Keamanan
-          </h3>
-          <button className="w-full py-2 bg-slate-100 text-slate-600 rounded-lg text-sm font-bold hover:bg-slate-200 transition-all">
-            Ubah Kata Sandi
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

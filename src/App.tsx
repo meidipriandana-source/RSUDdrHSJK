@@ -18,7 +18,7 @@ import EditCertModal from './components/EditCertModal';
 import EditEmployeeModal from './components/EditEmployeeModal';
 import NotificationToast from './components/NotificationToast';
 import ConfirmModal from './components/ConfirmModal';
-import { cn } from './lib/utils';
+import { cn, parseDate, sanitizeId } from './lib/utils';
 import { FileText, Calendar, Clock, AlertTriangle, LogIn, Award, BadgeCheck, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -85,7 +85,9 @@ export default function App() {
 
   // Auth Listener
   useEffect(() => {
+    console.log("Setting up auth listener...");
     const unsubscribe = onAuthStateChanged(auth, (user) => {
+      console.log("Auth state changed. User:", user ? user.email : "Logged out");
       setUser(user);
       setAuthLoading(false);
     });
@@ -145,26 +147,7 @@ export default function App() {
     if (certificatesData.length === 0) return;
 
     const now = new Date();
-    const parseDate = (dateStr: string) => {
-      if (!dateStr) return null;
-      try {
-        if (dateStr.includes('/')) {
-            const parts = dateStr.split('/');
-            return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
-        }
-        const parts = dateStr.split(' ');
-        if (parts.length < 3) return null;
-        const day = parseInt(parts[0]);
-        const monthMap: Record<string, number> = {
-          'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'Mei': 4, 'Jun': 5, 'Jul': 6, 'Agu': 7, 'Sep': 8, 'Okt': 9, 'Nov': 10, 'Des': 11,
-          'May': 4, 'Aug': 7, 'Oct': 9, 'Dec': 11
-        };
-        const month = monthMap[parts[1]] ?? 0;
-        const year = parseInt(parts[2]);
-        return new Date(year, month, day);
-      } catch { return null; }
-    };
-
+    
     const dismissedIds = JSON.parse(localStorage.getItem('dismissedNotifications') || '[]');
     
     const newNotifications = certificatesData.filter(c => {
@@ -216,14 +199,22 @@ export default function App() {
     provider.setCustomParameters({ prompt: 'select_account' });
     
     try {
-      await signInWithPopup(auth, provider);
+      console.log("Initiating signInWithPopup...");
+      const result = await signInWithPopup(auth, provider);
+      console.log("Sign in successful. User:", result.user.email);
+      showToast('Berhasil masuk!', 'success');
     } catch (err: any) {
-      // Handle the case where the user cancels the popup or another request is pending
-      if (err.code === 'auth/cancelled-popup-request' || err.code === 'auth/popup-closed-by-user') {
-        console.log('SignIn cancelled or interrupted');
+      console.error('Full Login Error:', err);
+      // Detailed error breakdown
+      const errorCode = err.code;
+      const errorMessage = err.message;
+      
+      if (errorCode === 'auth/cancelled-popup-request' || errorCode === 'auth/popup-closed-by-user') {
+        console.log('Login cancelled by user');
+      } else if (errorCode === 'auth/unauthorized-domain') {
+        showToast('Domain tidak terdaftar di Firebase Auth. Hubungi admin.', 'error');
       } else {
-        console.error('Login failed:', err);
-        showToast('Gagal masuk. Silakan coba lagi.', 'error');
+        showToast(`Gagal masuk: ${errorMessage || errorCode}`, 'error');
       }
     } finally {
       setIsLoggingIn(false);
@@ -294,7 +285,7 @@ export default function App() {
     reader.readAsText(file);
   };
 
-  const sanitizeId = (id: string) => id.replace(/\//g, '-').replace(/\s+/g, '_');
+
 
   const handleDeleteCertificate = (id: string | string[]) => {
     const isMultiple = Array.isArray(id);
@@ -324,84 +315,6 @@ export default function App() {
       }
     });
   };
-
-  // One-time Cleanup of Dana Data (Requested by user)
-  useEffect(() => {
-    if (!user || (certificatesData.length === 0 && employeesData.length === 0)) return;
-
-    const performDanaCleanup = async () => {
-      const hasCleanedDana = localStorage.getItem('app_dana_data_cleaned');
-      if (hasCleanedDana) return;
-
-      try {
-        console.log('Performing one-time cleanup of Dana records...');
-        // 1. Delete certificates belonging to Dana
-        const certToDelete = certificatesData.filter(d => {
-          const owner = (d.owner || '').toLowerCase();
-          return owner.includes('dana');
-        });
-
-        for (const d of certToDelete) {
-          await deleteDoc(doc(db, 'certificates', d.id));
-        }
-
-        // 2. Delete employee profiles belonging to Dana
-        const empToDelete = employeesData.filter(d => {
-          const name = (d.name || '').toLowerCase();
-          return name.includes('dana');
-        });
-
-        for (const d of empToDelete) {
-          await deleteDoc(doc(db, 'employees', d.id));
-        }
-
-        localStorage.setItem('app_dana_data_cleaned', 'true');
-      } catch (e) {
-        console.error('Dana cleanup error:', e);
-      }
-    };
-
-    performDanaCleanup();
-  }, [user, certificatesData.length, employeesData.length]);
-
-  // One-time Cleanup of Sample Data (Requested by user)
-  useEffect(() => {
-    if (!user || certificatesData.length === 0 && employeesData.length === 0) return;
-
-    const performCleanup = async () => {
-      const hasCleaned = localStorage.getItem('app_sample_data_cleaned_v2');
-      if (hasCleaned) return;
-
-      try {
-        console.log('Performing one-time cleanup of non-Dana records...');
-        // 1. Delete certificates not belonging to Dana
-        const certToDelete = certificatesData.filter(d => {
-          const owner = (d.owner || '').toLowerCase();
-          return !owner.includes('dana');
-        });
-
-        for (const d of certToDelete) {
-          await deleteDoc(doc(db, 'certificates', d.id));
-        }
-
-        // 2. Delete employee profiles not belonging to Dana
-        const empToDelete = employeesData.filter(d => {
-          const name = (d.name || '').toLowerCase();
-          return !name.includes('dana');
-        });
-
-        for (const d of empToDelete) {
-          await deleteDoc(doc(db, 'employees', d.id));
-        }
-
-        localStorage.setItem('app_sample_data_cleaned_v2', 'true');
-      } catch (e) {
-        console.error('Cleanup error:', e);
-      }
-    };
-
-    performCleanup();
-  }, [user, certificatesData.length, employeesData.length]);
 
   const handleEditCertificate = (cert: any) => {
     setEditingCert(cert);
@@ -646,18 +559,18 @@ export default function App() {
     setConfirmConfig({
       isOpen: true,
       title: 'Hapus SEMUA Data?',
-      message: 'Apakah Anda yakin ingin menghapus SEMUA data sertifikat dan karyawan? Tindakan ini tidak dapat dibatalkan.',
+      message: 'Apakah Anda yakin ingin menghapus SEMUA data sertifikat dan karyawan milik Anda? Tindakan ini tidak dapat dibatalkan.',
       onConfirm: async () => {
         setIsDeleting(true);
         try {
-          const certSnap = await getDocs(collection(db, 'certificates'));
-          const certPromises = certSnap.docs.map(d => deleteDoc(d.ref));
+          const certSnap = await getDocs(query(collection(db, 'certificates'), where('ownerId', '==', user?.uid)));
+          const certPromises = certSnap.docs.map(d => deleteDoc(doc(db, 'certificates', d.id)));
           
-          const empSnap = await getDocs(collection(db, 'employees'));
-          const empPromises = empSnap.docs.map(d => deleteDoc(d.ref));
+          const empSnap = await getDocs(query(collection(db, 'employees'), where('ownerId', '==', user?.uid)));
+          const empPromises = empSnap.docs.map(d => deleteDoc(doc(db, 'employees', d.id)));
           
           await Promise.all([...certPromises, ...empPromises]);
-          showToast('Semua data berhasil dihapus.');
+          showToast('Semua data Anda berhasil dihapus.');
         } catch (err) {
           handleFirestoreError(err, OperationType.DELETE, 'all');
           showToast('Gagal menghapus data. Silakan coba lagi.', 'error');
@@ -671,27 +584,6 @@ export default function App() {
   const analyticsStats = useMemo(() => {
     const now = new Date();
     
-    // Helper to parse dates like "12 Jan 2024" or "12/01/2024"
-    const parseDate = (dateStr: string) => {
-      if (!dateStr) return null;
-      try {
-        if (dateStr.includes('/')) {
-            const parts = dateStr.split('/');
-            return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
-        }
-        const parts = dateStr.split(' ');
-        if (parts.length < 3) return null;
-        const day = parseInt(parts[0]);
-        const monthMap: Record<string, number> = {
-          'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'Mei': 4, 'Jun': 5, 'Jul': 6, 'Agu': 7, 'Sep': 8, 'Okt': 9, 'Nov': 10, 'Des': 11,
-          'May': 4, 'Aug': 7, 'Oct': 9, 'Dec': 11
-        };
-        const month = monthMap[parts[1]] ?? 0;
-        const year = parseInt(parts[2]);
-        return new Date(year, month, day);
-      } catch { return null; }
-    };
-
     const activeCount = certificatesData.filter(c => c.status === 'Aktif').length;
     
     const expiringSoon = certificatesData.filter(c => {

@@ -35,12 +35,5 @@
 
 :root {
   font-family: var(--font-sans);
-  --primary: #2563EB;
-  --secondary: #1E293B;
-  --accent: #38BDF8;
-  --background: #F8FAFC;
-  --text: #0F172A;
-  --success: #22C55E;
-  --danger: #EF4444;
 }
 
