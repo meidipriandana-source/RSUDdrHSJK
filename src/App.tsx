@@ -44,6 +44,7 @@ import {
 } from 'firebase/auth';
 import { db, auth, handleFirestoreError, OperationType } from './lib/firebase';
 import LandingView from './components/LandingView';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -1029,7 +1030,7 @@ export default function App() {
       />
     </div>
     <PrintReport certificates={certificatesData} />
+    <SpeedInsights />
   </>
 );
 }
-
